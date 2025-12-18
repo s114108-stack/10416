@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>記憶翻牌配對遊戲</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            max-width: 600px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            width: 120px;
+            height: 160px;
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card.matched {
+            cursor: default;
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .card-back {
+            background: 
+                repeating-linear-gradient(45deg, #3498db 0px, #3498db 10px, #5dade2 10px, #5dade2 20px),
+                repeating-linear-gradient(-45deg, #1abc9c 0px, #1abc9c 10px, #48c9b0 10px, #48c9b0 20px);
+            background-blend-mode: multiply;
+            border: 3px solid #16a085;
+        }
+
+        .card-front {
+            background: white;
+            transform: rotateY(180deg);
+            padding: 20px;
+        }
+
+        .card-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .card-suit {
+            font-size: 60px;
+        }
+
+        .spade { color: #000; }
+        .club { color: #000; }
+        .heart { color: #e74c3c; }
+        .diamond { color: #e74c3c; }
+
+        .controls {
+            text-align: center;
+        }
+
+        button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.3);
+        }
+
+        .message {
+            color: white;
+            font-size: 24px;
+            margin-top: 20px;
+            min-height: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px 60px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            animation: modalPop 0.5s ease-out;
+        }
+
+        @keyframes modalPop {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .modal-content h2 {
+            color: #667eea;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .modal-content p {
+            color: #666;
+            font-size: 20px;
+            margin-bottom: 30px;
+        }
+
+        .modal-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s;
+        }
+
+        .modal-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎴 記憶翻牌配對遊戲 🎴</h1>
+    <div class="game-board" id="gameBoard"></div>
+    <div class="controls">
+        <button onclick="initGame()">重新開始</button>
+        <div class="message" id="message"></div>
+    </div>
+
+    <div class="modal" id="winModal">
+        <div class="modal-content">
+            <h2>🎉 恭喜過關！🎉</h2>
+            <p>你成功配對所有卡牌！</p>
+            <button class="modal-button" onclick="closeModal()">太棒了！</button>
+        </div>
+    </div>
+
+    <script>
+        const suits = [
+            { name: 'spade', symbol: '♠' },
+            { name: 'club', symbol: '♣' },
+            { name: 'heart', symbol: '♥' },
+            { name: 'diamond', symbol: '♦' }
+        ];
+        
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let canFlip = true;
+
+        function createCards() {
+            const cardData = [];
+            
+            // 創建8組牌：數字1-8，每個數字配對兩張相同花色
+            for (let num = 1; num <= 8; num++) {
+                const suit = suits[(num - 1) % 4];
+                cardData.push({ number: num, suit: suit, id: `${num}-${suit.name}-1` });
+                cardData.push({ number: num, suit: suit, id: `${num}-${suit.name}-2` });
+            }
+            
+            // 洗牌
+            return cardData.sort(() => Math.random() - 0.5);
+        }
+
+        function initGame() {
+            cards = createCards();
+            flippedCards = [];
+            matchedPairs = 0;
+            canFlip = true;
+            document.getElementById('message').textContent = '';
+            document.getElementById('winModal').classList.remove('show');
+            renderBoard();
+        }
+
+        function closeModal() {
+            document.getElementById('winModal').classList.remove('show');
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('gameBoard');
+            board.innerHTML = '';
+            
+            cards.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'card';
+                cardElement.dataset.index = index;
+                
+                cardElement.innerHTML = `
+                    <div class="card-face card-back"></div>
+                    <div class="card-face card-front">
+                        <div class="card-number">${card.number}</div>
+                        <div class="card-suit ${card.suit.name}">${card.suit.symbol}</div>
+                    </div>
+                `;
+                
+                cardElement.addEventListener('click', () => flipCard(index));
+                board.appendChild(cardElement);
+            });
+        }
+
+        function flipCard(index) {
+            if (!canFlip) return;
+            
+            const cardElement = document.querySelectorAll('.card')[index];
+            
+            // 不能翻已經翻開或已配對的牌
+            if (cardElement.classList.contains('flipped') || 
+                cardElement.classList.contains('matched')) {
+                return;
+            }
+            
+            // 不能翻超過兩張
+            if (flippedCards.length >= 2) return;
+            
+            cardElement.classList.add('flipped');
+            flippedCards.push(index);
+            
+            if (flippedCards.length === 2) {
+                canFlip = false;
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const [index1, index2] = flippedCards;
+            const card1 = cards[index1];
+            const card2 = cards[index2];
+            
+            const cardElements = document.querySelectorAll('.card');
+            
+            setTimeout(() => {
+                if (card1.number === card2.number && card1.suit.name === card2.suit.name) {
+                    // 配對成功
+                    cardElements[index1].classList.add('matched');
+                    cardElements[index2].classList.add('matched');
+                    matchedPairs++;
+                    
+                    if (matchedPairs === 8) {
+                        setTimeout(() => {
+                            document.getElementById('winModal').classList.add('show');
+                        }, 500);
+                    }
+                } else {
+                    // 配對失敗，翻回背面
+                    cardElements[index1].classList.remove('flipped');
+                    cardElements[index2].classList.remove('flipped');
+                }
+                
+                flippedCards = [];
+                canFlip = true;
+            }, 1000);
+        }
+
+        // 初始化遊戲
+        initGame();
+    </script>
+</body>
+</html>
